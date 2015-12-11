@@ -161,7 +161,14 @@ class LVQ
     @result.each{ |key,value|
       file = File.open("#{key}.txt","w+")
       puts "#{key}:#{@result[key].size}個\n"
+      t1 = value[0][0]
       value.each do |a|
+        t2 = a[0]
+        if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
+          file.puts("\n")
+          t1 = t2
+        end
+        t1 = t2
         file.puts("#{a}\n")
       end
       file.close
