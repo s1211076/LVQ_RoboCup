@@ -33,7 +33,7 @@ class Logkaiseki
         left = show['left']
         right= show['right']
         position = Array.new #ボールの座標、左チームの各選手の座標、右チームの各選手の座標の順で配列に格納
-        
+                             #時間を配列の先頭に追加
         if time.to_i == @count then  
           #ボールの位置を格納
           position.push(ball[0].to_f)
@@ -49,7 +49,10 @@ class Logkaiseki
             position.push(r[2].to_f)
           end
           v = Vector.elements(position,true)
-          @posi_data.push(v) #データ点にposition配列をベクトル化したものを追加
+          #time
+          position.unshift(time.to_i)
+          
+          @posi_data.push(position.dup) #データ点にposition配列をベクトル化したものを追加
           if @count % 500 == 0 then
              @daihyo[@key.to_s] = v
             @key += 1 #キーの値をインクリメント 
@@ -73,7 +76,9 @@ class Logkaiseki
             position.push(r[2].to_f)
           end
           v = Vector.elements(position,true)
-          @posi_data.push(v)
+          #time
+          position.unshift(time.to_i)
+          @posi_data.push(position.dup)
           position.clear
           @count += 1
         end #if_end
@@ -104,10 +109,12 @@ class LVQ
   def lvq
 
     #すべてのデータ点について
-    @data.each  do |v|
+    @data.each  do |d|
       v_min = 99999999999.0         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
-
+      d2 = d.dup
+      d2.shift
+      v = Vector.elements(d2,true)
       @daihyo.each{ |key,value|     #代表点との距離を計算
         tmp_v = v-value
         if tmp_v.r < v_min then
@@ -130,12 +137,15 @@ class LVQ
   end
 
   def daihyo_output #代表ベクトルの最終的な値をファイルに出力
+                    #ラベル付けしたデータをグループごとにファイル出力
                     #また、データ点のラベル付を行う
-    res = Array.new
     #すべてのデータ点について
-    @data.each  do |v|
+    @data.each  do |d|
       v_min = 99999999999.0         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
+      d2 = d.dup
+      d2.shift
+      v = Vector.elements(d2,true)
       @daihyo.each{ |key,value|     #代表点との距離を計算
         tmp_v = v-value             #データ点と代表点との差を計算　
         if tmp_v.r < v_min then     #差の距離（ノルム）を計算し、それが記録されていた最小値より小さい時
@@ -144,12 +154,17 @@ class LVQ
         end
       }     
      #データ点にラベル付を行う
-     res = v
-     @result[min] << res 
+     @result[min] << d
     end
 
+    #ラベル付けされたデータをグループごとにファイル出力
     @result.each{ |key,value|
+      file = File.open("#{key}.txt","w+")
       puts "#{key}:#{@result[key].size}個\n"
+      value.each do |a|
+        file.puts("#{a}\n")
+      end
+      file.close
     }
 
     count=1
@@ -179,7 +194,7 @@ data = game.return_data
 daihyo = game.return_daihyo
 
 lvq = LVQ.new(daihyo,data)
-2.times do #LVQを1000回行う
+5.times do #LVQを1000回行う
 lvq.lvq
 end
 lvq.daihyo_output
