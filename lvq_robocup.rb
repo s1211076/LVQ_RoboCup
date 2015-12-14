@@ -137,15 +137,18 @@ class LVQ
   end
 
   def daihyo_output #代表ベクトルの最終的な値をファイルに出力
-                    #ラベル付けしたデータをグループごとにファイル出力
-                    #また、データ点のラベル付を行う
+    #ラベル付けしたデータをグループごとにファイル出力
+    #また、データ点のラベル付を行う
     #すべてのデータ点について
+    group_nagare = {} #試合状態の流れが同一グループにいくつ存在するか記録しておくハッシュ
+    #key => "ラベル" value => (試合状態の流れの数)
+    group_mitudo = {} #グループに属す全てのテスト点から代表点までの距離の和を記録しておく（最終的に平均を取る）
     @data.each  do |d|
       v_min = 99999999999.0         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
-      d2 = d.dup
-      d2.shift
-      v = Vector.elements(d2,true)
+      d2 = d.dup                  
+      d2.shift                      #ベクトル計算のために先頭の時間を配列から取り出す
+      v = Vector.elements(d2,true)  #先頭に記録されていた時間を取り除いた配列をベクトル化
       @daihyo.each{ |key,value|     #代表点との距離を計算
         tmp_v = v-value             #データ点と代表点との差を計算　
         if tmp_v.r < v_min then     #差の距離（ノルム）を計算し、それが記録されていた最小値より小さい時
@@ -153,18 +156,33 @@ class LVQ
           v_min = tmp_v.r           #距離の最小値を更新
         end
       }     
-     #データ点にラベル付を行う
-     @result[min] << d
+      #データ点にラベル付を行う
+      @result[min] << d
+      #グループの全てのテスト点から代表点までの距離の和を記録しておく
+      if !(group_mitudo.has_key?(min)) then #まだキーminが登録されていない時
+        group_mitudo[min] = v_min
+      else                                  #登録されている時
+        group_mitudo[min] += v_min
+      end
+
+      #グループの流れを記録するハッシュを初期化しておく
+      if !(group_nagare.has_key?(min)) then #hashがkeyとしてminを持っていなければ
+        group_nagare[min] = 1               #key=>minに試合の流れの数を1で初期化して代入
+      end
     end
+    
+  
 
     #ラベル付けされたデータをグループごとにファイル出力
     @result.each{ |key,value|
       file = File.open("#{key}.txt","w+")
-      puts "#{key}:#{@result[key].size}個\n"
-      t1 = value[0][0]
+      mitudo = group_mitudo[key]/@result[key].size
+      puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
+      t1 = value[0][0] #今のデータの時間を記録
       value.each do |a|
-        t2 = a[0]
+        t2 = a[0]      #次のデータの時間を記録
         if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
+          group_nagare[key] += 1 #試合状態の流れの数をインクリメント
           file.puts("\n")
           t1 = t2
         end
@@ -173,6 +191,8 @@ class LVQ
       end
       file.close
     }
+
+    p group_nagare
 
     count=1
     file = File.open("result.txt","w+")
@@ -201,7 +221,7 @@ data = game.return_data
 daihyo = game.return_daihyo
 
 lvq = LVQ.new(daihyo,data)
-5.times do #LVQを1000回行う
+5.times do #LVQをn回行う
 lvq.lvq
 end
 lvq.daihyo_output
