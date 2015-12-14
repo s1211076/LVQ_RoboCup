@@ -221,7 +221,7 @@ data = game.return_data
 daihyo = game.return_daihyo
 
 lvq = LVQ.new(daihyo,data)
-5.times do #LVQをn回行う
+2.times do #LVQをn回行う
 lvq.lvq
 end
 lvq.daihyo_output
