@@ -21,8 +21,8 @@ class Logkaiseki
     return @daihyo
   end
   
-  def kaiseki
-    txtfile = File.open("json.txt") #このファイル内に"試合状態が記録されたファイルのファイル名"が記録されている
+  def kaiseki(filename)
+    txtfile = File.open(filename) #このファイル内に"試合状態が記録されたファイルのファイル名"が記録されている
     txtfile.each_line do |line|  #jxon.txtファイル中に記録されているファイル名を1行ずつ読み込む
       json_data = JSON.load(File.read(line.chomp)) #.chompは末尾の改行文字を削除した文字列を返す
       json_data.each do |datan|  #大元の繰り返し,JSONデータの配列すべてに関して
@@ -60,38 +60,23 @@ class Logkaiseki
           position.clear #配列を空にする
           @count +=1
           #3000ステップ目はカウントされないみたいなので、countが3000になった時の場合を考える
-        elsif @count == 3000 then
-          @count = 3001
-          #ball
-          position.push(ball[0].to_f)
-          position.push(ball[1].to_f)
-          #left_team
-          left.each do |l|
-            position.push(l[1].to_f)
-            position.push(l[2].to_f)
+          if @count == 3000 then
+            @count = 3001
           end
-          #right_team
-          right.each do |r|
-            position.push(r[1].to_f)
-            position.push(r[2].to_f)
-          end
-          v = Vector.elements(position,true)
-          #time
-          position.unshift(time.to_i)
-          @posi_data.push(position.dup)
-          position.clear
-          @count += 1
-        end #if_end
+        end # if_end
+          #--ここから 19 行はうえのコピーなので、if time.to_i == @count ... と if @count == 3000 という @count の操作だけ取り出して別にして書き直せる。
+          #-- うまく書くとここまでの 19 行は削除できる。
         
       end #each_end
     end #each.line_end
     txtfile.close
   end #kaiseki_end
+  
 end #class_end
 
 class LVQ
   ALPHA1 = 0.01  #代表点を近づけるときに使う定数
-  ALPHA2 = 0.0001 #代表点を遠ざけるときに使う定数α(0<α<1)
+  ALPHA2 = ALPHA1 * 0.01 #代表点を遠ざけるときに使う定数α(0<α<1) # ALPHA1 に対する相対値で表示 (1/100)
   def initialize(amb,data) #代表ベクトル、データベクトルを初期値として受け取る
     count = 1
     file = File.open("pre.txt","w+")
@@ -110,7 +95,7 @@ class LVQ
 
     #すべてのデータ点について
     @data.each  do |d|
-      v_min = 99999999999.0         #距離の最小値を保存
+      v_min = Float::MAX         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
       d2 = d.dup
       d2.shift
@@ -144,7 +129,7 @@ class LVQ
     #key => "ラベル" value => (試合状態の流れの数)
     group_mitudo = {} #グループに属す全てのテスト点から代表点までの距離の和を記録しておく（最終的に平均を取る）
     @data.each  do |d|
-      v_min = 99999999999.0         #距離の最小値を保存
+      v_min = Float::MAX         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
       d2 = d.dup                  
       d2.shift                      #ベクトル計算のために先頭の時間を配列から取り出す
@@ -211,17 +196,22 @@ class LVQ
 end  #class_end
 
 #------------------------------------main-----------------------------------------
+def main
+  
+  data = Array.new
+  daihyo = {}
+  
+  game = Logkaiseki.new
+  game.kaiseki("json.txt")
+  data = game.return_data
+  daihyo = game.return_daihyo
+  
+  lvq = LVQ.new(daihyo,data)
+  2.times do #LVQをn回行う
+    lvq.lvq
+  end
+  lvq.daihyo_output
 
-data = Array.new
-daihyo = {}
-
-game = Logkaiseki.new
-game.kaiseki
-data = game.return_data
-daihyo = game.return_daihyo
-
-lvq = LVQ.new(daihyo,data)
-2.times do #LVQをn回行う
-lvq.lvq
 end
-lvq.daihyo_output
+
+main
