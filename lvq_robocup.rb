@@ -160,21 +160,24 @@ class LVQ
 
     #ラベル付けされたデータをグループごとにファイル出力
     @result.each{ |key,value|
-      file = File.open("#{key}.txt","w+")
-      mitudo = group_mitudo[key]/@result[key].size
-      puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
-      t1 = value[0][0] #今のデータの時間を記録
-      value.each do |a|
-        t2 = a[0]      #次のデータの時間を記録
-        if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
+      Dir.mkdir(key)  #ラベル名のディレクトリを作成
+      Dir.chdir(key){ #作成したディレクトリに移動して実行
+        file = File.open("#{key}.txt","w+")
+        mitudo = group_mitudo[key]/@result[key].size
+        puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
+        t1 = value[0][0] #今のデータの時間を記録
+        value.each do |a|
+          t2 = a[0]      #次のデータの時間を記録
+          if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
           group_nagare[key] += 1 #試合状態の流れの数をインクリメント
           file.puts("\n")
           t1 = t2
         end
-        t1 = t2
-        file.puts("#{a}\n")
-      end
-      file.close
+          t1 = t2
+          file.puts("#{a}\n")
+        end
+        file.close
+      }
     }
 
     p group_nagare
