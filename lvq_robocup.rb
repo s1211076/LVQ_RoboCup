@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 require 'json'
 require 'matrix'
+require 'fileutils'
 
 #-------------------------------------------class--------------------------------------------------
 class Logkaiseki
@@ -10,8 +11,6 @@ class Logkaiseki
     @posi_data = Array.new #position配列を格納
     @daihyo = {} # key=> "数字" value=> 代表点の配列
   end
-
- 
 
   def return_data
     return @posi_data
@@ -80,6 +79,9 @@ class LVQ
   def initialize(amb,data) #代表ベクトル、データベクトルを初期値として受け取る
     count = 1
     file = File.open("pre.txt","w+")
+    @group_nagare = {} #試合状態の流れが同一グループにいくつ存在するか記録しておくハッシュ
+    #key => "ラベル" value => (試合状態の流れの数)
+    @group_mitudo = {} #グループに属す全てのテスト点から代表点までの距離の和を記録しておく（最終的に平均を取る）
     @daihyo = amb #ハッシュ
     @data = data  #配列
     @result = Hash.new{|h,key| h[key]=[]}#ラベル付けしたデータ点を記録
@@ -119,19 +121,18 @@ class LVQ
       
     end
     
-  end
+  end #lvq_end
 
   def daihyo_output #代表ベクトルの最終的な値をファイルに出力
-    #ラベル付けしたデータをグループごとにファイル出力
-    #また、データ点のラベル付を行う
+    #データ点にラベル付けし、resultハッシュに追加
     #すべてのデータ点について
-    group_nagare = {} #試合状態の流れが同一グループにいくつ存在するか記録しておくハッシュ
-    #key => "ラベル" value => (試合状態の流れの数)
-    group_mitudo = {} #グループに属す全てのテスト点から代表点までの距離の和を記録しておく（最終的に平均を取る）
+
+
+
     @data.each  do |d|
       v_min = Float::MAX         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
-      d2 = d.dup                  
+      d2 = d.dup                    #配列の中身だけコピー
       d2.shift                      #ベクトル計算のために先頭の時間を配列から取り出す
       v = Vector.elements(d2,true)  #先頭に記録されていた時間を取り除いた配列をベクトル化
       @daihyo.each{ |key,value|     #代表点との距離を計算
@@ -144,52 +145,55 @@ class LVQ
       #データ点にラベル付を行う
       @result[min] << d
       #グループの全てのテスト点から代表点までの距離の和を記録しておく
-      if !(group_mitudo.has_key?(min)) then #まだキーminが登録されていない時
-        group_mitudo[min] = v_min
+      if !(@group_mitudo.has_key?(min)) then #まだキーminが登録されていない時
+        @group_mitudo[min] = v_min
       else                                  #登録されている時
-        group_mitudo[min] += v_min
+        @group_mitudo[min] += v_min
       end
 
       #グループの流れを記録するハッシュを初期化しておく
-      if !(group_nagare.has_key?(min)) then #hashがkeyとしてminを持っていなければ
-        group_nagare[min] = 1               #key=>minに試合の流れの数を1で初期化して代入
+      if !(@group_nagare.has_key?(min)) then #hashがkeyとしてminを持っていなければ
+        @group_nagare[min] = 1               #key=>minに試合の流れの数を1で初期化して代入
       end
     end
-    
-  
-
-    #ラベル付けされたデータをグループごとにファイル出力
-    @result.each{ |key,value|
-      Dir.mkdir(key)  #ラベル名のディレクトリを作成
-      Dir.chdir(key){ #作成したディレクトリに移動して実行
-        file = File.open("#{key}.txt","w+")
-        mitudo = group_mitudo[key]/@result[key].size
-        puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
-        t1 = value[0][0] #今のデータの時間を記録
-        value.each do |a|
-          t2 = a[0]      #次のデータの時間を記録
-          if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
-          group_nagare[key] += 1 #試合状態の流れの数をインクリメント
-          file.puts("\n")
-          t1 = t2
-        end
-          t1 = t2
-          file.puts("#{a}\n")
-        end
-        file.close
-      }
-    }
-
-    p group_nagare
-
+ 
     count=1
     file = File.open("result.txt","w+")
     @daihyo.each{ |key,value|
       file.puts"key=>#{key} value=>#{value}\n\n"  
     }
     file.close
-  end
+  end #output_end
 
+  def rabel_output #ラベル付けしたデータをtxtファイルに出力
+    FileUtils.rm_r("result") #中身があっても強制的に削除    
+    Dir.mkdir("result")    #resultというディレクトリを作成
+    Dir.chdir("result") {  #作成したディレクトリに移動し実行
+      #ラベル付けされたデータをグループごとにファイル出力
+      @result.each{ |key,value|
+        file = File.open("#{key}.txt","w+") 
+        rcg_file = File.open("#{key}.rcg","w+")
+        mitudo = @group_mitudo[key]/@result[key].size
+        puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
+        t1 = value[0][0] #今のデータの時間を記録
+        value.each do |a|
+          t2 = a[0]      #次のデータの時間を記録
+          if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
+            @group_nagare[key] += 1 #試合状態の流れの数をインクリメント
+            file.puts("\n")
+            t1 = t2
+            end
+          t1 = t2
+          file.puts("#{a}\n")
+        end
+        file.close
+      }
+    }
+    p @group_nagare
+  end #rabel_output end
+
+  def rcg_convert(arr,rcg) #配列とファイル名を受け取り、rcg形式でデータを出力
+  end
 
   #代表ベクトルを表示
   def print
@@ -214,7 +218,7 @@ def main
     lvq.lvq
   end
   lvq.daihyo_output
-
+  lvq.rabel_output
 end
 
 main
