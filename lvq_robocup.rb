@@ -126,9 +126,6 @@ class LVQ
   def daihyo_output #代表ベクトルの最終的な値をファイルに出力
     #データ点にラベル付けし、resultハッシュに追加
     #すべてのデータ点について
-
-
-
     @data.each  do |d|
       v_min = Float::MAX         #距離の最小値を保存
       min = "0"                     #最も近い代表点のキーを保存
@@ -173,10 +170,14 @@ class LVQ
       @result.each{ |key,value|
         file = File.open("#{key}.txt","w+") 
         rcg_file = File.open("#{key}.rcg","w+")
+        if FileTest.zero?(rcg_file) then #ファイルが空の時
+          rcg_file.puts("ULG5\n")
+        end
         mitudo = @group_mitudo[key]/@result[key].size
         puts "#{key}:テスト点の数,#{@result[key].size}個　平均距離,#{mitudo}\n"
         t1 = value[0][0] #今のデータの時間を記録
         value.each do |a|
+          rcg_convert(a,rcg_file)
           t2 = a[0]      #次のデータの時間を記録
           if (t2-t1) > 1 then #時間の流れが途切れたら区切りを入れる
             @group_nagare[key] += 1 #試合状態の流れの数をインクリメント
@@ -193,6 +194,19 @@ class LVQ
   end #rabel_output end
 
   def rcg_convert(arr,rcg) #配列とファイル名を受け取り、rcg形式でデータを出力
+    rcg.print( "(show #{arr[0]} ((b) #{arr[1].to_f} #{arr[2].to_f} 0 0) " ) #ball
+    count = 0
+    11.times do |i|  #left_team
+      tmp = 3 + count
+      rcg.print( "((l #{i+1}) 0 0x1 #{arr[tmp].to_f} #{arr[tmp+1].to_f} 0 0 0 0 (v h 180) (s 8000 0 0 0) (c 0 0 0 0 0 0 0 0 0 0 0)) " )
+      count += 2
+    end
+    11.times do |i|  #right_team
+      tmp = 3 + count
+      rcg.print( "((r #{i+1}) 0 0x1 #{arr[tmp].to_f} #{arr[tmp+1].to_f} 0 0 0 0 (v h 180) (s 8000 0 0 0) (c 0 0 0 0 0 0 0 0 0 0 0)) " )
+      count += 2
+    end
+    rcg.puts(")")
   end
 
   #代表ベクトルを表示
