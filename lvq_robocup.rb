@@ -2,6 +2,7 @@
 require 'json'
 require 'matrix'
 require 'fileutils'
+require 'benchmark'
 
 #-------------------------------------------class--------------------------------------------------
 class Logkaiseki
@@ -10,6 +11,7 @@ class Logkaiseki
     @count = 1
     @posi_data = Array.new #position配列を格納
     @daihyo = {} # key=> "数字" value=> 代表点の配列
+    @daihyo_count = 1
   end
 
   def return_data
@@ -19,7 +21,7 @@ class Logkaiseki
   def return_daihyo
     return @daihyo
   end
-  
+ 
   def kaiseki(filename)
     txtfile = File.open(filename) #このファイル内に"試合状態が記録されたファイルのファイル名"が記録されている
     txtfile.each_line do |line|  #jxon.txtファイル中に記録されているファイル名を1行ずつ読み込む
@@ -52,8 +54,8 @@ class Logkaiseki
           position.unshift(time.to_i)
           
           @posi_data.push(position.dup) #データ点にposition配列をベクトル化したものを追加
-          if @count % 500 == 0 then
-             @daihyo[@key.to_s] = v
+          if @count % 500 == 0 && @daihyo_count==1 then #試合時間が500sごとかつ1試合目の時
+            @daihyo[@key.to_s] = v
             @key += 1 #キーの値をインクリメント 
           end
           position.clear #配列を空にする
@@ -63,10 +65,9 @@ class Logkaiseki
             @count = 3001
           end
         end # if_end
-          #--ここから 19 行はうえのコピーなので、if time.to_i == @count ... と if @count == 3000 という @count の操作だけ取り出して別にして書き直せる。
-          #-- うまく書くとここまでの 19 行は削除できる。
-        
       end #each_end
+      @count=1 #カウントをリセット
+      @daihyo_count=-1 #−1に設定し、代表点をこれ以上増やさないようにする(この値と条件によって代表点の変更が可能)
     end #each.line_end
     txtfile.close
   end #kaiseki_end
@@ -75,7 +76,7 @@ end #class_end
 
 class LVQ
   ALPHA1 = 0.01  #代表点を近づけるときに使う定数
-  ALPHA2 = ALPHA1 * 0.01 #代表点を遠ざけるときに使う定数α(0<α<1) # ALPHA1 に対する相対値で表示 (1/100)
+  ALPHA2 = ALPHA1 * 0.0 #代表点を遠ざけるときに使う定数α(0<α<1) # ALPHA1 に対する相対値で表示 (1/100)
   def initialize(amb,data) #代表ベクトル、データベクトルを初期値として受け取る
     count = 1
     file = File.open("pre.txt","w+")
@@ -222,17 +223,22 @@ def main
   data = Array.new
   daihyo = {}
   
-  game = Logkaiseki.new
-  game.kaiseki("json.txt")
-  data = game.return_data
-  daihyo = game.return_daihyo
-  
-  lvq = LVQ.new(daihyo,data)
-  2.times do #LVQをn回行う
-    lvq.lvq
+  kaiseki = Benchmark.realtime do
+    game = Logkaiseki.new
+    game.kaiseki("json.txt")
+    data = game.return_data
+    daihyo = game.return_daihyo
   end
-  lvq.daihyo_output
-  lvq.rabel_output
+  result = Benchmark.realtime do
+    lvq = LVQ.new(daihyo,data)
+    2.times do #LVQをn回行う
+      lvq.lvq
+    end
+    lvq.daihyo_output
+    lvq.rabel_output
+  end
+  puts "解析時間 #{kaiseki}s"
+  puts "実行時間 #{result}s"
 end
 
 main
